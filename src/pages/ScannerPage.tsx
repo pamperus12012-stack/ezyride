@@ -16,17 +16,8 @@ function ScannerPage() {
       setCameraError(null)
 
       try {
-        const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices()
-        if (!isMounted) return
-
-        const deviceId = videoInputDevices[0]?.deviceId
-        if (!deviceId) {
-          setCameraError('No camera found on this device.')
-          return
-        }
-
         controls = await codeReader.decodeFromVideoDevice(
-          deviceId,
+          undefined,
           videoRef.current ?? undefined,
           (result, error) => {
             if (result) {
