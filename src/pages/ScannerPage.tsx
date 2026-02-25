@@ -63,12 +63,6 @@ function ScannerPage() {
       isMounted = false
       if (controls && typeof controls.stop === 'function') {
         controls.stop()
-      } else {
-        try {
-          codeReader.stopContinuousDecode()
-        } catch {
-          // ignore if method not available
-        }
       }
     }
   }, [navigate])

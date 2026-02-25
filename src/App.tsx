@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import HomePage from './pages/HomePage'
@@ -14,7 +15,7 @@ import AboutPage from './pages/AboutPage'
 import ContactPage from './pages/ContactPage'
 import { supabase } from './lib/supabaseClient'
 
-function ProtectedRoute({ children }: { children: JSX.Element }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
   const [checking, setChecking] = useState(true)
   const [isAuthed, setIsAuthed] = useState(false)
 

@@ -67,8 +67,9 @@ function HomePage() {
       return
     }
 
+    const rental = activeRental
     function updateRemaining() {
-      const end = new Date(activeRental.endTime as string).getTime()
+      const end = new Date(rental.endTime as string).getTime()
       const now = Date.now()
       const diffMs = end - now
       if (diffMs <= 0) {
