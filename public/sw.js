@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ezyride-cache-v1'
+const CACHE_NAME = 'ezyride-cache-v2'
 const ASSETS = ['/', '/index.html']
 
 self.addEventListener('install', (event) => {
@@ -28,12 +28,22 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Navigation requests (visiting / or /login etc.): network first, then cache
+  // so the root URL always gets fresh HTML and never a stale blank page
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => response)
+        .catch(() => caches.match('/index.html').then((cached) => cached || caches.match('/')))
+    )
+    return
+  }
+
+  // Other assets: cache first, then network
   event.respondWith(
     caches.match(request).then((cached) => {
-      if (cached) {
-        return cached
-      }
-      return fetch(request).catch(() => caches.match('/index.html'))
+      if (cached) return cached
+      return fetch(request).catch(() => (request.url.endsWith('.html') ? caches.match('/index.html') : null))
     }),
   )
 })
