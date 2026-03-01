@@ -32,12 +32,12 @@ function HomePage() {
 
   async function loadCycles() {
     setError(null)
-    const { data, err } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('cycles')
       .select('id, name, status, eta_minutes, unavailable_until')
       .order('name', { ascending: true })
 
-    if (err) {
+    if (fetchError) {
       setError('Unable to load live availability right now.')
     } else if (data) {
       setCycles(data as Cycle[])
