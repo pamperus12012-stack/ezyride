@@ -24,46 +24,52 @@ function HomePage() {
   const navigate = useNavigate()
   const [cycles, setCycles] = useState<Cycle[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeRental, setActiveRental] = useState<ActiveRental | null>(null)
   const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null)
   const [, setClock] = useState(0)
 
-  useEffect(() => {
-    async function loadCycles() {
-      setLoading(true)
-      setError(null)
+  async function loadCycles() {
+    setError(null)
+    const { data, err } = await supabase
+      .from('cycles')
+      .select('id, name, status, eta_minutes, unavailable_until')
+      .order('name', { ascending: true })
 
-      const { data, error } = await supabase
-        .from('cycles')
-        .select('id, name, status, eta_minutes, unavailable_until')
-        .order('name', { ascending: true })
-
-      if (error) {
-        setError('Unable to load live availability right now.')
-      } else if (data) {
-        setCycles(data as Cycle[])
-      }
-
-      setLoading(false)
+    if (err) {
+      setError('Unable to load live availability right now.')
+    } else if (data) {
+      setCycles(data as Cycle[])
     }
+  }
 
-    void loadCycles()
+  async function handleRefresh() {
+    setRefreshing(true)
+    setLoading(true)
+    await loadCycles()
+    setLoading(false)
+    setRefreshing(false)
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    void loadCycles().finally(() => setLoading(false))
 
     const channel = supabase
       .channel('public:cycles')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cycles' },
-        () => {
-          // when any cycle row changes, refresh the list
-          void loadCycles()
-        },
+        () => void loadCycles(),
       )
       .subscribe()
 
+    const intervalId = window.setInterval(() => void loadCycles(), 60 * 1000)
+
     return () => {
       supabase.removeChannel(channel)
+      window.clearInterval(intervalId)
     }
   }, [])
 
@@ -189,7 +195,7 @@ function HomePage() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.2em] text-neutral/70">
                   Availability
@@ -213,10 +219,38 @@ function HomePage() {
                   </p>
                 )}
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                Live
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={refreshing || loading}
+                  className="rounded-full p-2 text-neutral/70 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Refresh availability"
+                  aria-label="Refresh availability"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={refreshing ? 'animate-spin' : ''}
+                  >
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 21h5v-5" />
+                  </svg>
+                </button>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-300">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Live
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
