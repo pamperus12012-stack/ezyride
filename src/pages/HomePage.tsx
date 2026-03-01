@@ -20,6 +20,11 @@ type ActiveRental = {
   endTime?: string
 }
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
 function HomePage() {
   const navigate = useNavigate()
   const [cycles, setCycles] = useState<Cycle[]>([])
@@ -29,6 +34,9 @@ function HomePage() {
   const [activeRental, setActiveRental] = useState<ActiveRental | null>(null)
   const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null)
   const [, setClock] = useState(0)
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null)
+  const [installed, setInstalled] = useState(false)
 
   async function loadCycles() {
     setError(null)
@@ -134,6 +142,49 @@ function HomePage() {
 
   const totalCycles = cycles.length
   const nowMs = Date.now()
+
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true
+
+  const isIos =
+    /iPhone|iPad|iPod/i.test(window.navigator.userAgent) &&
+    !(window.navigator as any).standalone
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(e: Event) {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+
+    function handleAppInstalled() {
+      setInstalled(true)
+      setDeferredPrompt(null)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  const showAndroidInstallButton =
+    !!deferredPrompt && !installed && !isStandalone && !isIos
+
+  const showIosInstallHint = !showAndroidInstallButton && isIos && !isStandalone
+
+  async function handleInstallClick() {
+    if (!deferredPrompt) return
+    await deferredPrompt.prompt()
+    const choice = await deferredPrompt.userChoice
+    setDeferredPrompt(null)
+    if (choice.outcome === 'accepted') {
+      setInstalled(true)
+    }
+  }
 
   function effectiveCycleStatus(cycle: Cycle): Cycle['status'] {
     if (cycle.status !== 'unavailable') return cycle.status
@@ -343,19 +394,41 @@ function HomePage() {
         </section>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 border-t border-white/5 bg-slate-950/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-md items-center justify-around px-4 py-2.5 text-[11px]">
-          <button
-            className="flex flex-col items-center gap-1 text-accent"
-            onClick={() => navigate('/home')}
-          >
-            <span className="h-5 w-5 rounded-full border border-accent flex items-center justify-center text-[10px]">
-              H
-            </span>
-            <span>Home</span>
-          </button>
-        </div>
-      </nav>
+      {showAndroidInstallButton && (
+        <nav className="fixed inset-x-0 bottom-0 border-t border-white/5 bg-slate-950/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-md items-center justify-center px-4 py-2.5 text-[11px]">
+            <button
+              className="flex flex-row items-center gap-2 rounded-2xl bg-white text-slate-950 border border-accent px-4 py-2 text-sm font-semibold shadow-md active:scale-[0.98]"
+              onClick={handleInstallClick}
+            >
+              <span className="h-5 w-5 rounded-full border border-accent flex items-center justify-center text-[10px]">
+                ⬇
+              </span>
+              <span>Install app</span>
+            </button>
+          </div>
+        </nav>
+      )}
+
+      {showIosInstallHint && (
+        <nav className="fixed inset-x-0 bottom-0 border-t border-white/5 bg-slate-950/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-md items-center justify-center px-4 py-2.5 text-[11px]">
+            <button
+              className="flex flex-row items-center gap-2 rounded-2xl bg-white text-slate-950 border border-accent px-4 py-2 text-sm font-semibold shadow-md active:scale-[0.98]"
+              onClick={() =>
+                alert(
+                  'To install on iPhone: 1) Open this site in Safari, 2) Tap the Share button, 3) Choose "Add to Home Screen".',
+                )
+              }
+            >
+              <span className="h-5 w-5 rounded-full border border-accent flex items-center justify-center text-[10px]">
+                ⬇
+              </span>
+              <span>How to install on iPhone</span>
+            </button>
+          </div>
+        </nav>
+      )}
     </AppShell>
   )
 }
