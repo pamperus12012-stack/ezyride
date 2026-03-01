@@ -27,7 +27,7 @@ function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const [activeRental, setActiveRental] = useState<ActiveRental | null>(null)
   const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null)
-  const [clock, setClock] = useState(0)
+  const [, setClock] = useState(0)
 
   useEffect(() => {
     async function loadCycles() {
