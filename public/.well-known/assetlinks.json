@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vercel.ezyride_neon.twa",
+      "sha256_cert_fingerprints": [
+        "48:7C:1C:B9:0B:D2:75:F5:87:24:F1:5E:D9:FA:53:C0:1E:59:8E:9A:00:98:B7:DD:4A:67:2E:97:E3:E7:1A:E7"
+      ]
+    }
+  }
+]
