@@ -33,7 +33,7 @@ function WalletTopupPage() {
 
     // If Razorpay is not configured, fall back to direct credit (dev/test only).
     if (!window.Razorpay || !keyId) {
-      const { data: walletResult, error } = await supabaseFunctionsClient.functions.invoke(
+      const { data: walletResult, error } = await supabase.functions.invoke(
         'wallet-apply-transaction',
         {
           body: {
@@ -121,7 +121,7 @@ function WalletTopupPage() {
         }
 
         const { data: walletResult, error } =
-          await supabaseFunctionsClient.functions.invoke('wallet-apply-transaction', {
+          await supabase.functions.invoke('wallet-apply-transaction', {
             body: {
               type: 'credit',
               amount,
