@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
@@ -20,11 +21,15 @@ function PaymentPage() {
   const state = (location.state || {}) as PaymentLocationState
 
   const { cycleId, cycleName, hours, amount } = state
+  const [paying, setPaying] = useState(false)
 
   const hasData = cycleId && cycleName && hours && amount
 
   async function handlePay() {
+    if (paying) return
+    setPaying(true)
     if (!hasData) {
+      setPaying(false)
       navigate('/home')
       return
     }
@@ -51,9 +56,10 @@ function PaymentPage() {
       if (isEffectivelyAvailable) {
         // ok to continue
       } else {
-      alert('This cycle just became unavailable. Please pick another cycle.')
-      navigate('/home', { replace: true })
-      return
+        alert('This cycle just became unavailable. Please pick another cycle.')
+        setPaying(false)
+        navigate('/home', { replace: true })
+        return
       }
     }
 
@@ -62,7 +68,6 @@ function PaymentPage() {
       // Fallback: keep existing fake flow if Razorpay is not available
       const now = new Date()
       const end = new Date(now.getTime() + (hours as number) * 60 * 60 * 1000)
-
       navigate('/confirmation', {
         replace: true,
         state: {
@@ -74,23 +79,52 @@ function PaymentPage() {
           endTime: end.toISOString(),
         },
       })
+      setPaying(false)
       return
     }
 
     const {
       data: { user },
     } = await supabase.auth.getUser()
-
     const now = new Date()
     const end = new Date(now.getTime() + (hours as number) * 60 * 60 * 1000)
+    const amountPaise = (amount as number) * 100
 
-    const options = {
+    // Prefer server-created order (live payments: amount cannot be tampered with)
+    let orderId: string | null = null
+    const { data: orderData } = await supabase.functions.invoke('create-razorpay-order', {
+      body: {
+        amount_paise: amountPaise,
+        currency: 'INR',
+        cycle_name: cycleName,
+        hours: hours as number,
+      },
+    })
+    if (orderData?.order_id) {
+      orderId = orderData.order_id
+    }
+
+    const options: Record<string, unknown> = {
       key: keyId,
-      amount: (amount as number) * 100, // Razorpay expects paise
-      currency: 'INR',
       name: 'Ezyride',
       description: `${cycleName} – ${(hours as number).toString()} hour(s)`,
-      handler: (response: any) => {
+      prefill: { email: user?.email ?? '' },
+      notes: { cycleId },
+      theme: { color: '#1E40AF' },
+      handler: async (response: { razorpay_order_id?: string; razorpay_payment_id?: string; razorpay_signature?: string }) => {
+        if (orderId && response.razorpay_order_id && response.razorpay_payment_id && response.razorpay_signature) {
+          const { data: verifyData } = await supabase.functions.invoke('verify-razorpay-payment', {
+            body: {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            },
+          })
+          if (verifyData?.verified !== true) {
+            alert('Payment verification failed. Please contact support if you were charged.')
+            return
+          }
+        }
         navigate('/confirmation', {
           replace: true,
           state: {
@@ -104,17 +138,16 @@ function PaymentPage() {
           },
         })
       },
-      prefill: {
-        email: user?.email ?? '',
-      },
-      notes: {
-        cycleId,
-      },
-      theme: {
-        color: '#1E40AF',
-      },
     }
 
+    if (orderId) {
+      options.order_id = orderId
+    } else {
+      options.amount = amountPaise
+      options.currency = 'INR'
+    }
+
+    setPaying(false)
     const rzp = new window.Razorpay(options)
     rzp.open()
   }
@@ -152,7 +185,7 @@ function PaymentPage() {
             Payment
           </p>
           <h1 className="mt-1 text-lg font-semibold tracking-tight">
-            Razorpay checkout (demo)
+            Pay securely
           </h1>
         </div>
       </header>
@@ -187,8 +220,8 @@ function PaymentPage() {
             Secure payment
           </p>
           <p>
-            In production, this screen will open the Razorpay checkout window
-            so you can pay securely using UPI, cards, or net banking.
+            Pay with UPI, card, or net banking. The amount is fixed by the server
+            and verified after payment before your ride is confirmed.
           </p>
         </section>
 
@@ -206,9 +239,10 @@ function PaymentPage() {
       <footer className="border-t border-white/5 bg-slate-950/90 backdrop-blur-md px-6 py-3">
         <button
           onClick={handlePay}
-          className="w-full rounded-2xl bg-white text-slate-950 border border-accent px-4 py-3 text-sm font-semibold shadow-md active:scale-[0.98]"
+          disabled={paying}
+          className="w-full rounded-2xl bg-white text-slate-950 border border-accent px-4 py-3 text-sm font-semibold shadow-md active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none"
         >
-          Pay with Razorpay
+          {paying ? 'Preparing…' : 'Pay with Razorpay'}
         </button>
       </footer>
     </div>

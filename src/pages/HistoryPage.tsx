@@ -1,3 +1,4 @@
+import { useActiveRentalLocation } from '../hooks/useActiveRentalLocation'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import AppShell from '../components/AppShell'

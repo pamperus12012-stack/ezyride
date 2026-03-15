@@ -13,11 +13,22 @@ import ProfilePage from './pages/ProfilePage'
 import GalleryPage from './pages/GalleryPage'
 import AboutPage from './pages/AboutPage'
 import ContactPage from './pages/ContactPage'
+import AdminPage from './pages/AdminPage'
+import WalletPage from './pages/WalletPage'
+import WalletTopupPage from './pages/WalletTopupPage'
+import BlockedPage from './pages/BlockedPage'
 import { supabase } from './lib/supabaseClient'
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
+function ProtectedRoute({
+  children,
+  allowBlocked,
+}: {
+  children: ReactNode
+  allowBlocked?: boolean
+}) {
   const [checking, setChecking] = useState(true)
   const [isAuthed, setIsAuthed] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -28,6 +39,26 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
       } = await supabase.auth.getSession()
       if (!isMounted) return
       setIsAuthed(!!session)
+
+      // If authed, check if user is blocked (wallet limit exceeded)
+      if (session?.user) {
+        const { data: blockRow } = await supabase
+          .from('user_blocks')
+          .select('id, blocked_until')
+          .eq('user_id', session.user.id)
+          .eq('block_type', 'wallet_limit_exceeded')
+          .maybeSingle()
+
+        if (!isMounted) return
+        const blocked =
+          !!blockRow &&
+          (blockRow.blocked_until == null ||
+            new Date(blockRow.blocked_until).getTime() > Date.now())
+        setIsBlocked(blocked)
+      } else {
+        setIsBlocked(false)
+      }
+
       setChecking(false)
     }
 
@@ -38,6 +69,25 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return
       setIsAuthed(!!session)
+      // best-effort refresh block status next tick
+      if (session?.user) {
+        void (async () => {
+          const { data: blockRow } = await supabase
+            .from('user_blocks')
+            .select('id, blocked_until')
+            .eq('user_id', session.user.id)
+            .eq('block_type', 'wallet_limit_exceeded')
+            .maybeSingle()
+          if (!isMounted) return
+          const blocked =
+            !!blockRow &&
+            (blockRow.blocked_until == null ||
+              new Date(blockRow.blocked_until).getTime() > Date.now())
+          setIsBlocked(blocked)
+        })()
+      } else {
+        setIsBlocked(false)
+      }
     })
 
     return () => {
@@ -58,6 +108,10 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />
   }
 
+  if (isBlocked && !allowBlocked) {
+    return <Navigate to="/blocked" replace />
+  }
+
   return children
 }
 
@@ -73,6 +127,30 @@ function App() {
           element={
             <ProtectedRoute>
               <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wallet"
+          element={
+            <ProtectedRoute allowBlocked>
+              <WalletPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wallet/topup"
+          element={
+            <ProtectedRoute allowBlocked>
+              <WalletTopupPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/blocked"
+          element={
+            <ProtectedRoute allowBlocked>
+              <BlockedPage />
             </ProtectedRoute>
           }
         />
@@ -145,6 +223,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ContactPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
             </ProtectedRoute>
           }
         />

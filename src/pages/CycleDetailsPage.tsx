@@ -81,14 +81,46 @@ function CycleDetailsPage() {
       alert('This cycle is currently in use. Please pick another cycle.')
       return
     }
-    navigate('/payment', {
-      state: {
-        cycleId: id,
-        cycleName,
-        hours,
-        amount: totalAmount,
-      },
-    })
+    // Wallet-only flow: ensure at least ₹40 available before proceeding
+    ;(async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        navigate('/login', { replace: true })
+        return
+      }
+
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      const balance = Number(wallet?.balance ?? 0)
+      if (!Number.isFinite(balance) || balance < 40) {
+        alert(
+          'You need at least ₹40 in your wallet to start a ride. Please top up your wallet first.',
+        )
+        navigate('/wallet')
+        return
+      }
+
+      const now = new Date()
+      const end = new Date(now.getTime() + hours * 60 * 60 * 1000)
+
+      navigate('/confirmation', {
+        replace: false,
+        state: {
+          cycleId: id,
+          cycleName,
+          hours,
+          amount: totalAmount,
+          startTime: now.toISOString(),
+          endTime: end.toISOString(),
+        },
+      })
+    })()
   }
 
   return (

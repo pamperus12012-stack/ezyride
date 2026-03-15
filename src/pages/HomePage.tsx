@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import AppShell from '../components/AppShell'
+import { useActiveRentalLocation } from '../hooks/useActiveRentalLocation'
 
 type Cycle = {
   id: string
@@ -18,6 +19,7 @@ type ActiveRental = {
   amount?: number
   startTime?: string
   endTime?: string
+  chargedHours?: number
 }
 
 type BeforeInstallPromptEvent = Event & {
@@ -37,6 +39,10 @@ function HomePage() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(false)
+
+  useActiveRentalLocation(
+    activeRental?.cycleName ? { cycleName: activeRental.cycleName } : null,
+  )
 
   async function loadCycles() {
     setError(null)
@@ -107,16 +113,53 @@ function HomePage() {
     }
 
     const rental = activeRental as ActiveRental & { endTime: string }
+    const plannedHours = Number(rental.hours ?? 0)
 
     async function markCycleAvailable() {
       if (!rental.cycleName) return
       try {
         await supabase
           .from('cycles')
-          .update({ status: 'available', eta_minutes: null })
+          .update({
+            status: 'available',
+            eta_minutes: null,
+            unavailable_until: null,
+          })
           .eq('name', rental.cycleName)
       } catch {
         // ignore best-effort failure
+      }
+    }
+
+    async function chargeNextHour(nextHourNumber: number) {
+      try {
+        const { data } = await supabase.functions.invoke('wallet-apply-transaction', {
+          body: {
+            type: 'debit',
+            amount: 40,
+            reason: `Ride charge: ${rental.cycleName} (hour ${nextHourNumber})`,
+          },
+        })
+
+        if (!data?.ok) {
+          throw new Error('wallet_debit_failed')
+        }
+
+        const updated: ActiveRental = {
+          ...rental,
+          chargedHours: nextHourNumber,
+        }
+        setActiveRental(updated)
+        localStorage.setItem('ezyride_active_rental', JSON.stringify(updated))
+      } catch {
+        alert('Wallet limit exceeded. Your account may be blocked. Please top up to continue.')
+        try {
+          await supabase.auth.signOut()
+        } catch {
+          // ignore
+        }
+        localStorage.removeItem('ezyride_active_rental')
+        navigate('/login', { replace: true })
       }
     }
 
@@ -124,6 +167,20 @@ function HomePage() {
       const end = new Date(rental.endTime as string).getTime()
       const now = Date.now()
       const diffMs = end - now
+
+      // Every full hour elapsed, charge ₹40 (up to planned hours)
+      if (rental.startTime && plannedHours > 0) {
+        const startMs = new Date(rental.startTime).getTime()
+        if (!Number.isNaN(startMs)) {
+          const elapsedHours = Math.floor((now - startMs) / (60 * 60 * 1000)) + 1
+          const alreadyCharged = Number(rental.chargedHours ?? 0)
+          const shouldCharge = Math.min(elapsedHours, plannedHours)
+          if (shouldCharge > alreadyCharged) {
+            void chargeNextHour(shouldCharge)
+          }
+        }
+      }
+
       if (diffMs <= 0) {
         setRemainingMinutes(0)
         setActiveRental(null)

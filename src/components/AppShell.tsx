@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 
 type AppShellProps = {
   children: ReactNode
@@ -9,6 +10,34 @@ type AppShellProps = {
 function AppShell({ children }: AppShellProps) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function checkAdmin() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!mounted || !user) return
+
+      const { data } = await supabase
+        .from('admin_users')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!mounted) return
+      setIsAdmin(!!data)
+    }
+
+    void checkAdmin()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
@@ -81,6 +110,15 @@ function AppShell({ children }: AppShellProps) {
                 className="w-full rounded-xl px-3 py-2 text-left hover:bg-white/5"
                 onClick={() => {
                   setMenuOpen(false)
+                  navigate('/wallet')
+                }}
+              >
+                Wallet
+              </button>
+              <button
+                className="w-full rounded-xl px-3 py-2 text-left hover:bg-white/5"
+                onClick={() => {
+                  setMenuOpen(false)
                   navigate('/profile')
                 }}
               >
@@ -142,6 +180,17 @@ function AppShell({ children }: AppShellProps) {
               >
                 Share app
               </button>
+              {isAdmin && (
+                <button
+                  className="w-full rounded-xl px-3 py-2 text-left hover:bg-white/5"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    navigate('/admin')
+                  }}
+                >
+                  Admin
+                </button>
+              )}
             </div>
           </div>
         </>

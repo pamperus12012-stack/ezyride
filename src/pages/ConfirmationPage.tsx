@@ -44,7 +44,74 @@ function ConfirmationPage() {
   }
 
   async function handleStartRiding() {
-    // Save rental in Supabase history (best-effort)
+    // 1. Claim the cycle first (update only if status=available) to prevent double-booking
+    let cycleClaimed = false
+    try {
+      if (cycleName && endTime) {
+        const { data: updatedRows, error: updateError } = await supabase
+          .from('cycles')
+          .update({
+            status: 'unavailable',
+            unavailable_until: endTime,
+          })
+          .eq('name', cycleName)
+          .eq('status', 'available')
+          .select('id')
+
+        if (updateError || !updatedRows?.length) {
+          cycleClaimed = true
+        }
+      }
+    } catch {
+      cycleClaimed = true
+    }
+
+    if (cycleClaimed) {
+      alert(
+        'This cycle was just taken by someone else. Your payment was successful; please contact support if you were charged, or pick another cycle from home.',
+      )
+      navigate('/home')
+      return
+    }
+
+    // 2. Charge first hour from wallet (₹40). Wallet can go down to -₹40.
+    const hourlyRate = 40
+    let chargedHours = 0
+    try {
+      const { data: walletResult } = await supabase.functions.invoke(
+        'wallet-apply-transaction',
+        {
+          body: {
+            type: 'debit',
+            amount: hourlyRate,
+            reason: `Ride started: ${cycleName} (hour 1)`,
+          },
+        },
+      )
+
+      if (!walletResult?.ok) {
+        throw new Error('wallet_debit_failed')
+      }
+      chargedHours = 1
+    } catch {
+      // revert cycle claim (best-effort)
+      try {
+        if (cycleName) {
+          await supabase
+            .from('cycles')
+            .update({ status: 'available', eta_minutes: null, unavailable_until: null })
+            .eq('name', cycleName)
+        }
+      } catch {
+        // ignore
+      }
+
+      alert('Wallet charge failed (or limit exceeded). Please top up your wallet.')
+      navigate('/wallet')
+      return
+    }
+
+    // 3. Save rental in Supabase history (only after cycle was successfully claimed and wallet was charged)
     try {
       const {
         data: { user },
@@ -63,22 +130,7 @@ function ConfirmationPage() {
       // ignore errors for now; UI will still continue
     }
 
-    // Mark the cycle as unavailable for all users while this rental is active
-    try {
-      if (cycleName && endTime) {
-        await supabase
-          .from('cycles')
-          .update({
-            status: 'unavailable',
-            unavailable_until: endTime,
-          })
-          .eq('name', cycleName)
-      }
-    } catch {
-      // best-effort only
-    }
-
-    // Store active rental locally so home screen can show timer
+    // 4. Store active rental locally so home screen can show timer
     try {
       const payload = {
         cycleId,
@@ -87,6 +139,7 @@ function ConfirmationPage() {
         amount,
         startTime,
         endTime,
+        chargedHours,
       }
       localStorage.setItem('ezyride_active_rental', JSON.stringify(payload))
     } catch {
