@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, supabaseFunctionsClient } from '../lib/supabaseClient'
 
-const presets = [100, 200, 500] as const
+const presets = [10, 20, 50] as const
 
 declare global {
   interface Window {
