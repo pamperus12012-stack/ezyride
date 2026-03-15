@@ -22,6 +22,8 @@ type Body = {
   type: 'credit' | 'debit'
   amount: number // rupees (can be decimal, but app uses integers)
   reason?: string
+  user_id: string
+  user_email?: string | null
 }
 
 const MIN_BALANCE = -40
@@ -37,14 +39,6 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !serviceKey) {
     return new Response(JSON.stringify({ error: 'Supabase env not configured' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const authHeader = req.headers.get('Authorization') ?? ''
-  if (!authHeader.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
-      status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
@@ -76,24 +70,17 @@ Deno.serve(async (req) => {
 
   // service role for DB writes, but use caller JWT for auth.getUser()
   const supabase = createClient(supabaseUrl, serviceKey, {
-    global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
+  const userId = body.user_id
+  const userEmail = body.user_email ?? null
+  if (!userId) {
+    return new Response(JSON.stringify({ error: 'Missing user_id' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-
-  const userId = user.id
-  const userEmail = user.email ?? null
 
   // If currently blocked, allow credit to potentially recover; disallow debit while blocked.
   const { data: blockRow } = await supabase

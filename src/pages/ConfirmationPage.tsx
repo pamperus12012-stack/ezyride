@@ -78,6 +78,13 @@ function ConfirmationPage() {
     const hourlyRate = 40
     let chargedHours = 0
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error('no_user')
+      }
+
       const { data: walletResult } = await supabase.functions.invoke(
         'wallet-apply-transaction',
         {
@@ -85,6 +92,8 @@ function ConfirmationPage() {
             type: 'debit',
             amount: hourlyRate,
             reason: `Ride started: ${cycleName} (hour 1)`,
+            user_id: user.id,
+            user_email: user.email,
           },
         },
       )

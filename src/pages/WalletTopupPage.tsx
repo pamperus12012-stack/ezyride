@@ -40,6 +40,8 @@ function WalletTopupPage() {
             type: 'credit',
             amount,
             reason: 'Wallet top up (manual)',
+            user_id: user.id,
+            user_email: user.email,
           },
         },
       )
@@ -126,6 +128,8 @@ function WalletTopupPage() {
               type: 'credit',
               amount,
               reason: 'Wallet top up via Razorpay',
+              user_id: user.id,
+              user_email: user.email,
             },
           })
 

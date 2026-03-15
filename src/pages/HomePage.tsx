@@ -133,11 +133,20 @@ function HomePage() {
 
     async function chargeNextHour(nextHourNumber: number) {
       try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+          throw new Error('no_user')
+        }
+
         const { data } = await supabase.functions.invoke('wallet-apply-transaction', {
           body: {
             type: 'debit',
             amount: 40,
             reason: `Ride charge: ${rental.cycleName} (hour ${nextHourNumber})`,
+            user_id: user.id,
+            user_email: user.email,
           },
         })
 
