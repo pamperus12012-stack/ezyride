@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, supabaseFunctionsClient } from '../lib/supabaseClient'
 
 type ConfirmationLocationState = {
   cycleId?: string
@@ -85,7 +85,7 @@ function ConfirmationPage() {
         throw new Error('no_user')
       }
 
-      const { data: walletResult } = await supabase.functions.invoke(
+      const { data: walletResult } = await supabaseFunctionsClient.functions.invoke(
         'wallet-apply-transaction',
         {
           body: {

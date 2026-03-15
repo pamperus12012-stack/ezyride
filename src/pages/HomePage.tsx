@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, supabaseFunctionsClient } from '../lib/supabaseClient'
 import AppShell from '../components/AppShell'
 import { useActiveRentalLocation } from '../hooks/useActiveRentalLocation'
 
@@ -140,7 +140,7 @@ function HomePage() {
           throw new Error('no_user')
         }
 
-        const { data } = await supabase.functions.invoke('wallet-apply-transaction', {
+        const { data } = await supabaseFunctionsClient.functions.invoke('wallet-apply-transaction', {
           body: {
             type: 'debit',
             amount: 40,
