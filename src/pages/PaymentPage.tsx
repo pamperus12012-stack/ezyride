@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, supabaseFunctionsClient } from '../lib/supabaseClient'
 
 type PaymentLocationState = {
   cycleId?: string
@@ -92,7 +92,7 @@ function PaymentPage() {
 
     // Prefer server-created order (live payments: amount cannot be tampered with)
     let orderId: string | null = null
-    const { data: orderData } = await supabase.functions.invoke('create-razorpay-order', {
+    const { data: orderData } = await supabaseFunctionsClient.functions.invoke('create-razorpay-order', {
       body: {
         amount_paise: amountPaise,
         currency: 'INR',
@@ -113,7 +113,7 @@ function PaymentPage() {
       theme: { color: '#1E40AF' },
       handler: async (response: { razorpay_order_id?: string; razorpay_payment_id?: string; razorpay_signature?: string }) => {
         if (orderId && response.razorpay_order_id && response.razorpay_payment_id && response.razorpay_signature) {
-          const { data: verifyData } = await supabase.functions.invoke('verify-razorpay-payment', {
+          const { data: verifyData } = await supabaseFunctionsClient.functions.invoke('verify-razorpay-payment', {
             body: {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,

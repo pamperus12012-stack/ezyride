@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, supabaseFunctionsClient } from '../lib/supabaseClient'
 
 const presets = [100, 200, 500] as const
 
@@ -33,7 +33,7 @@ function WalletTopupPage() {
 
     // If Razorpay is not configured, fall back to direct credit (dev/test only).
     if (!window.Razorpay || !keyId) {
-      const { data: walletResult, error } = await supabase.functions.invoke(
+      const { data: walletResult, error } = await supabaseFunctionsClient.functions.invoke(
         'wallet-apply-transaction',
         {
           body: {
@@ -60,7 +60,7 @@ function WalletTopupPage() {
     const {
       data: orderData,
       error: orderError,
-    } = await supabase.functions.invoke('create-razorpay-order', {
+    } = await supabaseFunctionsClient.functions.invoke('create-razorpay-order', {
       body: {
         amount_paise: amountPaise,
         currency: 'INR',
@@ -100,7 +100,7 @@ function WalletTopupPage() {
           response.razorpay_payment_id &&
           response.razorpay_signature
         ) {
-          const { data: verifyData } = await supabase.functions.invoke(
+          const { data: verifyData } = await supabaseFunctionsClient.functions.invoke(
             'verify-razorpay-payment',
             {
               body: {
@@ -121,7 +121,7 @@ function WalletTopupPage() {
         }
 
         const { data: walletResult, error } =
-          await supabase.functions.invoke('wallet-apply-transaction', {
+          await supabaseFunctionsClient.functions.invoke('wallet-apply-transaction', {
             body: {
               type: 'credit',
               amount,
