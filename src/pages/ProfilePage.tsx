@@ -54,6 +54,19 @@ function ProfilePage() {
 
         <section className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-neutral/60 space-y-2">
           <p className="text-[11px] uppercase tracking-[0.18em] text-neutral/70">
+            Admin
+          </p>
+          <p>Open admin tools (requires the admin password).</p>
+          <button
+            onClick={() => navigate('/admin')}
+            className="mt-2 w-full rounded-2xl bg-white/10 text-white border border-white/15 px-4 py-2 text-xs font-semibold shadow-md active:scale-[0.98]"
+          >
+            Admin tools
+          </button>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-neutral/60 space-y-2">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-neutral/70">
             Session
           </p>
           <p>You can safely sign out if you are using a shared device.</p>
